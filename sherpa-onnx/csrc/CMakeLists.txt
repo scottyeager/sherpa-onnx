@@ -318,6 +318,8 @@ if(SHERPA_ONNX_ENABLE_SPEAKER_DIARIZATION)
   list(APPEND sources
     fast-clustering-config.cc
     fast-clustering.cc
+    offline-sortformer-diarization-model-config.cc
+    offline-sortformer-diarization.cc
     offline-speaker-diarization-impl.cc
     offline-speaker-diarization-result.cc
     offline-speaker-diarization.cc

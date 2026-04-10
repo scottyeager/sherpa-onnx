@@ -4010,6 +4010,111 @@ SHERPA_ONNX_API void SherpaOnnxOfflineSpeakerDiarizationDestroyResult(
     const SherpaOnnxOfflineSpeakerDiarizationResult *r);
 
 // =========================================================================
+// For NVIDIA Sortformer speaker diarization (end-to-end, single-model)
+// =========================================================================
+
+/**
+ * @brief NVIDIA Sortformer diarization model configuration.
+ *
+ * Sortformer is a single end-to-end diarization model: given 16 kHz mono
+ * audio it directly emits per-frame speaker activity probabilities for a
+ * fixed number of speakers (4 in the public v2 checkpoint). Unlike the
+ * Pyannote pipeline there is no separate embedding extractor or clustering
+ * stage, so the configuration only needs the ONNX model path.
+ */
+typedef struct SherpaOnnxOfflineSortformerDiarizationModelConfig {
+  /** Path to the Sortformer ONNX model. */
+  const char *model;
+  /** Number of inference threads. */
+  int32_t num_threads;
+  /** Non-zero to print debug information. */
+  int32_t debug;
+  /** Execution provider such as `"cpu"`. */
+  const char *provider;
+} SherpaOnnxOfflineSortformerDiarizationModelConfig;
+
+/**
+ * @brief Configuration for NVIDIA Sortformer offline diarization.
+ */
+typedef struct SherpaOnnxOfflineSortformerDiarizationConfig {
+  /** Sortformer model configuration. */
+  SherpaOnnxOfflineSortformerDiarizationModelConfig model;
+  /** Sigmoid threshold to START a speaker segment. */
+  float onset;
+  /** Sigmoid threshold to END a speaker segment. */
+  float offset;
+  /** Segments shorter than this duration in seconds are discarded. */
+  float min_duration_on;
+  /** Gaps shorter than this duration in seconds cause segments to be merged. */
+  float min_duration_off;
+  /** Extra duration in seconds added before each detected segment. */
+  float pad_onset;
+  /** Extra duration in seconds added after each detected segment. */
+  float pad_offset;
+} SherpaOnnxOfflineSortformerDiarizationConfig;
+
+/** @brief Opaque Sortformer diarization handle. */
+typedef struct SherpaOnnxOfflineSortformerDiarization
+    SherpaOnnxOfflineSortformerDiarization;
+
+/**
+ * @brief Create a Sortformer diarization pipeline.
+ *
+ * @param config Sortformer diarization configuration.
+ * @return A newly allocated diarizer on success, or NULL on error. Free it
+ *         with SherpaOnnxDestroyOfflineSortformerDiarization().
+ */
+SHERPA_ONNX_API const SherpaOnnxOfflineSortformerDiarization *
+SherpaOnnxCreateOfflineSortformerDiarization(
+    const SherpaOnnxOfflineSortformerDiarizationConfig *config);
+
+/**
+ * @brief Destroy a Sortformer diarizer.
+ */
+SHERPA_ONNX_API void SherpaOnnxDestroyOfflineSortformerDiarization(
+    const SherpaOnnxOfflineSortformerDiarization *sd);
+
+/**
+ * @brief Return the expected input sample rate (always 16000).
+ */
+SHERPA_ONNX_API int32_t SherpaOnnxOfflineSortformerDiarizationGetSampleRate(
+    const SherpaOnnxOfflineSortformerDiarization *sd);
+
+/**
+ * @brief Return the number of speakers the model supports (always 4 for the
+ * public Sortformer v2 export).
+ */
+SHERPA_ONNX_API int32_t SherpaOnnxOfflineSortformerDiarizationGetNumSpeakers(
+    const SherpaOnnxOfflineSortformerDiarization *sd);
+
+/**
+ * @brief Update the post-processing thresholds of an existing Sortformer
+ * diarizer. Only the threshold fields in `config` are used; the model fields
+ * are ignored.
+ */
+SHERPA_ONNX_API void SherpaOnnxOfflineSortformerDiarizationSetConfig(
+    const SherpaOnnxOfflineSortformerDiarization *sd,
+    const SherpaOnnxOfflineSortformerDiarizationConfig *config);
+
+/**
+ * @brief Run Sortformer diarization over a mono waveform.
+ *
+ * @param sd A pointer returned by SherpaOnnxCreateOfflineSortformerDiarization().
+ * @param samples Input mono PCM samples normalized to [-1, 1].
+ * @param n Number of input samples.
+ * @return A newly allocated diarization result. The result type is the same
+ *         opaque SherpaOnnxOfflineSpeakerDiarizationResult used by the
+ *         Pyannote pipeline, so it can be inspected with
+ *         SherpaOnnxOfflineSpeakerDiarizationResultGetNumSpeakers(),
+ *         SherpaOnnxOfflineSpeakerDiarizationResultSortByStartTime() etc.
+ *         Free it with SherpaOnnxOfflineSpeakerDiarizationDestroyResult().
+ */
+SHERPA_ONNX_API const SherpaOnnxOfflineSpeakerDiarizationResult *
+SherpaOnnxOfflineSortformerDiarizationProcess(
+    const SherpaOnnxOfflineSortformerDiarization *sd, const float *samples,
+    int32_t n);
+
+// =========================================================================
 // For offline speech enhancement
 // =========================================================================
 /** @brief GTCRN offline denoiser model configuration. */
