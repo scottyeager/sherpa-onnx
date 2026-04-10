@@ -46,6 +46,7 @@
 #endif
 
 #if SHERPA_ONNX_ENABLE_SPEAKER_DIARIZATION == 1
+#include "sherpa-onnx/csrc/offline-sortformer-diarization.h"
 #include "sherpa-onnx/csrc/offline-speaker-diarization.h"
 #endif
 
@@ -3237,6 +3238,100 @@ SherpaOnnxOfflineSpeakerDiarizationProcessWithCallbackNoArg(
 
   return ans;
 }
+
+// ---------------------------------------------------------------------------
+// Sortformer diarization
+// ---------------------------------------------------------------------------
+
+struct SherpaOnnxOfflineSortformerDiarization {
+  std::unique_ptr<sherpa_onnx::OfflineSortformerDiarization> impl;
+};
+
+static sherpa_onnx::OfflineSortformerDiarizationConfig
+GetOfflineSortformerDiarizationConfig(
+    const SherpaOnnxOfflineSortformerDiarizationConfig *config) {
+  sherpa_onnx::OfflineSortformerDiarizationConfig sd_config;
+
+  sd_config.model.model = SHERPA_ONNX_OR(config->model.model, "");
+  sd_config.model.num_threads = SHERPA_ONNX_OR(config->model.num_threads, 1);
+  sd_config.model.debug = config->model.debug;
+  sd_config.model.provider = SHERPA_ONNX_OR(config->model.provider, "cpu");
+  if (sd_config.model.provider.empty()) {
+    sd_config.model.provider = "cpu";
+  }
+
+  sd_config.onset = SHERPA_ONNX_OR(config->onset, 0.641f);
+  sd_config.offset = SHERPA_ONNX_OR(config->offset, 0.561f);
+  sd_config.pad_onset = SHERPA_ONNX_OR(config->pad_onset, 0.229f);
+  sd_config.pad_offset = SHERPA_ONNX_OR(config->pad_offset, 0.079f);
+  sd_config.min_duration_on = SHERPA_ONNX_OR(config->min_duration_on, 0.511f);
+  sd_config.min_duration_off =
+      SHERPA_ONNX_OR(config->min_duration_off, 0.296f);
+
+  if (sd_config.model.debug) {
+#if __OHOS__
+    SHERPA_ONNX_LOGE("%{public}s\n", sd_config.ToString().c_str());
+#else
+    SHERPA_ONNX_LOGE("%s\n", sd_config.ToString().c_str());
+#endif
+  }
+
+  return sd_config;
+}
+
+const SherpaOnnxOfflineSortformerDiarization *
+SherpaOnnxCreateOfflineSortformerDiarization(
+    const SherpaOnnxOfflineSortformerDiarizationConfig *config) {
+  if (!config) return nullptr;
+
+  auto sd_config = GetOfflineSortformerDiarizationConfig(config);
+  if (!sd_config.Validate()) {
+    SHERPA_ONNX_LOGE("Errors in Sortformer diarization config");
+    return nullptr;
+  }
+
+  auto *sd = new SherpaOnnxOfflineSortformerDiarization;
+  sd->impl =
+      std::make_unique<sherpa_onnx::OfflineSortformerDiarization>(sd_config);
+  return sd;
+}
+
+void SherpaOnnxDestroyOfflineSortformerDiarization(
+    const SherpaOnnxOfflineSortformerDiarization *sd) {
+  if (!sd) return;
+  delete sd;
+}
+
+int32_t SherpaOnnxOfflineSortformerDiarizationGetSampleRate(
+    const SherpaOnnxOfflineSortformerDiarization *sd) {
+  if (!sd) return 0;
+  return sd->impl->SampleRate();
+}
+
+int32_t SherpaOnnxOfflineSortformerDiarizationGetNumSpeakers(
+    const SherpaOnnxOfflineSortformerDiarization *sd) {
+  if (!sd) return 0;
+  return sd->impl->NumSpeakers();
+}
+
+void SherpaOnnxOfflineSortformerDiarizationSetConfig(
+    const SherpaOnnxOfflineSortformerDiarization *sd,
+    const SherpaOnnxOfflineSortformerDiarizationConfig *config) {
+  if (!sd || !config) return;
+  auto sd_config = GetOfflineSortformerDiarizationConfig(config);
+  sd->impl->SetConfig(sd_config);
+}
+
+const SherpaOnnxOfflineSpeakerDiarizationResult *
+SherpaOnnxOfflineSortformerDiarizationProcess(
+    const SherpaOnnxOfflineSortformerDiarization *sd, const float *samples,
+    int32_t n) {
+  if (!sd) return nullptr;
+  auto *ans = new SherpaOnnxOfflineSpeakerDiarizationResult;
+  ans->impl = sd->impl->Process(samples, n);
+  return ans;
+}
+
 #else
 
 const SherpaOnnxOfflineSpeakerDiarization *
@@ -3328,6 +3423,50 @@ void SherpaOnnxOfflineSpeakerDiarizationDestroyResult(
     const SherpaOnnxOfflineSpeakerDiarizationResult *r) {
   SHERPA_ONNX_LOGE(
       "Speaker diarization is not enabled. Please rebuild sherpa-onnx");
+}
+
+const SherpaOnnxOfflineSortformerDiarization *
+SherpaOnnxCreateOfflineSortformerDiarization(
+    const SherpaOnnxOfflineSortformerDiarizationConfig *config) {
+  SHERPA_ONNX_LOGE(
+      "Speaker diarization is not enabled. Please rebuild sherpa-onnx");
+  return nullptr;
+}
+
+void SherpaOnnxDestroyOfflineSortformerDiarization(
+    const SherpaOnnxOfflineSortformerDiarization *sd) {
+  SHERPA_ONNX_LOGE(
+      "Speaker diarization is not enabled. Please rebuild sherpa-onnx");
+}
+
+int32_t SherpaOnnxOfflineSortformerDiarizationGetSampleRate(
+    const SherpaOnnxOfflineSortformerDiarization *sd) {
+  SHERPA_ONNX_LOGE(
+      "Speaker diarization is not enabled. Please rebuild sherpa-onnx");
+  return 0;
+}
+
+int32_t SherpaOnnxOfflineSortformerDiarizationGetNumSpeakers(
+    const SherpaOnnxOfflineSortformerDiarization *sd) {
+  SHERPA_ONNX_LOGE(
+      "Speaker diarization is not enabled. Please rebuild sherpa-onnx");
+  return 0;
+}
+
+void SherpaOnnxOfflineSortformerDiarizationSetConfig(
+    const SherpaOnnxOfflineSortformerDiarization *sd,
+    const SherpaOnnxOfflineSortformerDiarizationConfig *config) {
+  SHERPA_ONNX_LOGE(
+      "Speaker diarization is not enabled. Please rebuild sherpa-onnx");
+}
+
+const SherpaOnnxOfflineSpeakerDiarizationResult *
+SherpaOnnxOfflineSortformerDiarizationProcess(
+    const SherpaOnnxOfflineSortformerDiarization *sd, const float *samples,
+    int32_t n) {
+  SHERPA_ONNX_LOGE(
+      "Speaker diarization is not enabled. Please rebuild sherpa-onnx");
+  return nullptr;
 }
 
 #endif

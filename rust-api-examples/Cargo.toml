@@ -6,8 +6,10 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0"
 clap = { version = "4.5", features = ["derive"] }
-sherpa-onnx = { version = "1.12.37", default-features = false }
-# sherpa-onnx = { path = "../sherpa-onnx/rust/sherpa-onnx", default-features = false }
+# The sortformer_diarization example requires APIs not yet on crates.io.
+# Switch to the path dependency below to build against the in-tree crate.
+sherpa-onnx = { path = "../sherpa-onnx/rust/sherpa-onnx", default-features = false }
+# sherpa-onnx = { version = "1.12.37", default-features = false }
 serde_json = "1.0"
 
 cpal = { version = "0.16", optional = true } # cross-platform audio I/O

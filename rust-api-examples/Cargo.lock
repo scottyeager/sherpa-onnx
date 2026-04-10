@@ -892,7 +892,7 @@ dependencies = [
 
 [[package]]
 name = "rust-api-examples"
-version = "1.12.33"
+version = "1.12.34"
 dependencies = [
  "anyhow",
  "clap",
@@ -1010,7 +1010,7 @@ dependencies = [
 
 [[package]]
 name = "sherpa-onnx"
-version = "1.12.33"
+version = "1.12.34"
 dependencies = [
  "serde",
  "serde_json",
@@ -1019,7 +1019,7 @@ dependencies = [
 
 [[package]]
 name = "sherpa-onnx-sys"
-version = "1.12.33"
+version = "1.12.34"
 dependencies = [
  "bzip2",
  "tar",
