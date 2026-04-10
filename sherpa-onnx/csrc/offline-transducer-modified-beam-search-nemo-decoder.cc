@@ -18,6 +18,11 @@
 
 namespace sherpa_onnx {
 
+// Maximum non-blank tokens per frame before forcing blank advancement.
+// Matches NeMo's default max_symbols_per_step to prevent infinite loops
+// when all top-k candidates are non-blank with predicted_skip=0.
+static constexpr int32_t kMaxSymbolsPerFrame = 10;
+
 // Helper structure to track hypothesis with decoder state
 struct NeMoHypothesis {
   std::vector<int32_t> ys;          // token sequence (excluding initial blank)
@@ -29,12 +34,14 @@ struct NeMoHypothesis {
   const ContextState *context_state;       // context graph state
   OrtAllocator *allocator;                 // allocator for cloning states
   int32_t frame_offset;  // current frame position for this hypothesis
+  int32_t symbols_on_frame;  // non-blank tokens emitted on current frame
 
   NeMoHypothesis()
       : log_prob(0.0f),
         context_state(nullptr),
         allocator(nullptr),
-        frame_offset(0) {}
+        frame_offset(0),
+        symbols_on_frame(0) {}
 
   // Copy constructor - needed for hypothesis expansion
   NeMoHypothesis(const NeMoHypothesis &other)
@@ -45,7 +52,8 @@ struct NeMoHypothesis {
         log_prob(other.log_prob),
         context_state(other.context_state),
         allocator(other.allocator),
-        frame_offset(other.frame_offset) {
+        frame_offset(other.frame_offset),
+        symbols_on_frame(other.symbols_on_frame) {
     // Deep copy of decoder states
     decoder_states.reserve(other.decoder_states.size());
     for (const auto &state : other.decoder_states) {
@@ -63,6 +71,7 @@ struct NeMoHypothesis {
       context_state = other.context_state;
       allocator = other.allocator;
       frame_offset = other.frame_offset;
+      symbols_on_frame = other.symbols_on_frame;
 
       decoder_states.clear();
       decoder_states.reserve(other.decoder_states.size());
@@ -165,6 +174,27 @@ OfflineTransducerModifiedBeamSearchNeMoDecoder::Decode(
         if (hyp.frame_offset > min_frame) {
           // This hypothesis is ahead, keep it as-is
           all_candidates.emplace_back(hyp.log_prob, std::move(hyp));
+          continue;
+        }
+
+        // Safety guard matching NeMo's max_symbols_per_step: if this
+        // hypothesis has emitted too many non-blank tokens on the current
+        // frame, force a blank to advance the frame.  Without this,
+        // the while-loop can spin forever when blank is not in top-k
+        // and TDT predicts predicted_skip=0.
+        if (hyp.symbols_on_frame >= kMaxSymbolsPerFrame) {
+          NeMoHypothesis forced;
+          forced.ys = std::move(hyp.ys);
+          forced.timestamps = std::move(hyp.timestamps);
+          forced.durations = std::move(hyp.durations);
+          forced.ys_probs = std::move(hyp.ys_probs);
+          forced.log_prob = hyp.log_prob;  // keep current prob
+          forced.context_state = hyp.context_state;
+          forced.allocator = allocator;
+          forced.decoder_states = std::move(hyp.decoder_states);
+          forced.frame_offset = hyp.frame_offset + 1;  // advance by 1
+          forced.symbols_on_frame = 0;  // reset counter
+          all_candidates.emplace_back(forced.log_prob, std::move(forced));
           continue;
         }
 
@@ -295,6 +325,7 @@ OfflineTransducerModifiedBeamSearchNeMoDecoder::Decode(
             // For blank/unk in TDT, always advance by at least 1
             new_hyp.frame_offset =
                 hyp.frame_offset + std::max(1, predicted_skip);
+            new_hyp.symbols_on_frame = 0;  // frame advanced, reset counter
           } else {
             // Non-blank: add token, use new decoder state
             new_hyp.ys.push_back(token);
@@ -316,6 +347,13 @@ OfflineTransducerModifiedBeamSearchNeMoDecoder::Decode(
               new_hyp.frame_offset = hyp.frame_offset + predicted_skip;
             } else {
               new_hyp.frame_offset = hyp.frame_offset;
+            }
+
+            // Track symbols per frame for the safety guard
+            if (new_hyp.frame_offset == hyp.frame_offset) {
+              new_hyp.symbols_on_frame = hyp.symbols_on_frame + 1;
+            } else {
+              new_hyp.symbols_on_frame = 0;  // frame advanced, reset
             }
 
             // Update context graph
