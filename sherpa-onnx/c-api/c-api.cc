@@ -3267,6 +3267,7 @@ GetOfflineSortformerDiarizationConfig(
   sd_config.min_duration_on = SHERPA_ONNX_OR(config->min_duration_on, 0.511f);
   sd_config.min_duration_off =
       SHERPA_ONNX_OR(config->min_duration_off, 0.296f);
+  sd_config.median_window = SHERPA_ONNX_OR(config->median_window, 11);
 
   if (sd_config.model.debug) {
 #if __OHOS__

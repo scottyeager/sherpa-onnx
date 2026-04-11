@@ -77,6 +77,11 @@ pub struct OfflineSortformerDiarizationConfig {
     /// Gaps smaller than this duration (seconds) between two segments of the
     /// same speaker cause the segments to be merged.
     pub min_duration_off: f32,
+    /// Per-speaker median filter window (in 80 ms model frames) applied to
+    /// the sigmoid predictions before binarization. Matches NeMo's default
+    /// `median_window=11` for the callhome post-processing config. Set to
+    /// `1` to disable.
+    pub median_window: i32,
 }
 
 impl Default for OfflineSortformerDiarizationConfig {
@@ -89,6 +94,7 @@ impl Default for OfflineSortformerDiarizationConfig {
             pad_offset: 0.079,
             min_duration_on: 0.511,
             min_duration_off: 0.296,
+            median_window: 11,
         }
     }
 }
@@ -108,6 +114,7 @@ impl OfflineSortformerDiarizationConfig {
             min_duration_off: self.min_duration_off,
             pad_onset: self.pad_onset,
             pad_offset: self.pad_offset,
+            median_window: self.median_window,
         }
     }
 }

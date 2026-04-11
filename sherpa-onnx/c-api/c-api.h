@@ -4051,6 +4051,13 @@ typedef struct SherpaOnnxOfflineSortformerDiarizationConfig {
   float pad_onset;
   /** Extra duration in seconds added after each detected segment. */
   float pad_offset;
+  /**
+   * Per-speaker median filter window (in 80 ms model frames) applied to the
+   * sigmoid predictions before binarization. Matches NeMo's default
+   * median_window=11 for the callhome post-processing config. Pass 0 to use
+   * the default, or 1 to disable.
+   */
+  int32_t median_window;
 } SherpaOnnxOfflineSortformerDiarizationConfig;
 
 /** @brief Opaque Sortformer diarization handle. */

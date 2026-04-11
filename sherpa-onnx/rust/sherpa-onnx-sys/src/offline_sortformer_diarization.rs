@@ -25,6 +25,7 @@ pub struct OfflineSortformerDiarizationConfig {
     pub min_duration_off: c_float,
     pub pad_onset: c_float,
     pub pad_offset: c_float,
+    pub median_window: i32,
 }
 
 #[repr(C)]

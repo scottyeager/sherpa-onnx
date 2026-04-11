@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <memory>
 #include <sstream>
@@ -126,6 +127,36 @@ static std::vector<Seg> GapSegments(const std::vector<Seg> &segs) {
   return gaps;
 }
 
+// Per-speaker median filter over the raw sigmoid predictions. Mirrors NeMo's
+// median_filter post-processing step (scipy.signal.medfilt1d with mode=nearest).
+// `preds` is (n_frames, n_speakers) row-major; written in place.
+static void MedianFilterPerSpeaker(float *preds, int32_t n_frames,
+                                   int32_t n_speakers, int32_t window) {
+  if (window <= 1 || n_frames <= 0) return;
+  int32_t half = window / 2;
+  std::vector<float> buf(static_cast<size_t>(n_frames));
+  std::vector<float> tmp(static_cast<size_t>(window));
+  for (int32_t s = 0; s < n_speakers; ++s) {
+    for (int32_t t = 0; t < n_frames; ++t) {
+      buf[t] = preds[t * n_speakers + s];
+    }
+    for (int32_t t = 0; t < n_frames; ++t) {
+      int32_t lo = std::max(0, t - half);
+      int32_t hi = std::min(n_frames, t + half + 1);
+      int32_t m = hi - lo;
+      for (int32_t k = 0; k < m; ++k) tmp[k] = buf[lo + k];
+      std::nth_element(tmp.begin(), tmp.begin() + m / 2, tmp.begin() + m);
+      float median = tmp[m / 2];
+      if ((m & 1) == 0) {
+        float upper = median;
+        float lower = *std::max_element(tmp.begin(), tmp.begin() + m / 2);
+        median = 0.5f * (upper + lower);
+      }
+      preds[t * n_speakers + s] = median;
+    }
+  }
+}
+
 // Port of NeMo's binarization(): hysteresis thresholding with onset/offset
 // plus pad_onset/pad_offset and a merge-overlap step.
 static std::vector<Seg> BinarizePerSpeaker(const float *frames, int32_t n,
@@ -222,6 +253,13 @@ void OfflineSortformerDiarizationConfig::Register(ParseOptions *po) {
       "sortformer-min-duration-off", &min_duration_off,
       "If the gap between two segments of the same speaker is smaller "
       "than this (in seconds), the segments are merged.");
+
+  po->Register(
+      "sortformer-median-window", &median_window,
+      "Per-speaker median filter window (in model frames, 80 ms each) "
+      "applied to the sigmoid predictions before binarization. Matches "
+      "NeMo's default median_window=11 for the callhome post-processing "
+      "config. Set to 1 (or 0) to disable.");
 }
 
 bool OfflineSortformerDiarizationConfig::Validate() const {
@@ -258,6 +296,12 @@ bool OfflineSortformerDiarizationConfig::Validate() const {
         min_duration_off);
     return false;
   }
+  if (median_window < 0) {
+    SHERPA_ONNX_LOGE(
+        "sortformer-median-window must be non-negative. Given %d",
+        median_window);
+    return false;
+  }
   return true;
 }
 
@@ -271,7 +315,8 @@ std::string OfflineSortformerDiarizationConfig::ToString() const {
   os << "pad_onset=" << pad_onset << ", ";
   os << "pad_offset=" << pad_offset << ", ";
   os << "min_duration_on=" << min_duration_on << ", ";
-  os << "min_duration_off=" << min_duration_off << ")";
+  os << "min_duration_off=" << min_duration_off << ", ";
+  os << "median_window=" << median_window << ")";
 
   return os.str();
 }
@@ -306,6 +351,7 @@ class OfflineSortformerDiarization::Impl {
     config_.pad_offset = config.pad_offset;
     config_.min_duration_on = config.min_duration_on;
     config_.min_duration_off = config.min_duration_off;
+    config_.median_window = config.median_window;
   }
 
   OfflineSpeakerDiarizationResult Process(const float *audio, int32_t n) {
@@ -896,6 +942,20 @@ class OfflineSortformerDiarization::Impl {
     float audio_duration = static_cast<float>(num_audio_samples) /
                            static_cast<float>(kSortformerSampleRate);
 
+    // Optional per-speaker median filter over the raw sigmoid predictions,
+    // matching NeMo's ts_vad_post_processing. Copies preds into a local
+    // buffer so the input is left untouched.
+    std::vector<float> filtered_preds;
+    const float *preds_src = preds;
+    if (config_.median_window > 1 && num_frames > 0) {
+      filtered_preds.assign(
+          preds, preds + static_cast<size_t>(num_frames) *
+                             kSortformerNumSpeakers);
+      MedianFilterPerSpeaker(filtered_preds.data(), num_frames,
+                             kSortformerNumSpeakers, config_.median_window);
+      preds_src = filtered_preds.data();
+    }
+
     int32_t upsample = kSortformerSubsampling;
     int32_t n_audio_frames = num_frames * upsample;
     std::vector<float> channel(static_cast<size_t>(n_audio_frames), 0.0f);
@@ -903,7 +963,7 @@ class OfflineSortformerDiarization::Impl {
     for (int32_t spk = 0; spk < kSortformerNumSpeakers; ++spk) {
       // repeat_interleave: each model frame becomes `upsample` audio frames.
       for (int32_t t = 0; t < num_frames; ++t) {
-        float p = preds[t * kSortformerNumSpeakers + spk];
+        float p = preds_src[t * kSortformerNumSpeakers + spk];
         float *dst = channel.data() + t * upsample;
         for (int32_t k = 0; k < upsample; ++k) {
           dst[k] = p;

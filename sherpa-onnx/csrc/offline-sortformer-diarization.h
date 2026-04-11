@@ -36,19 +36,26 @@ struct OfflineSortformerDiarizationConfig {
   // same speaker cause the segments to be merged.
   float min_duration_off = 0.296f;
 
+  // Per-speaker median filter window (in model frames, 80 ms each) applied
+  // to the sigmoid predictions before binarization. Matches NeMo's default
+  // median_window=11 for the callhome post-processing config. Set to 1 (or 0)
+  // to disable.
+  int32_t median_window = 11;
+
   OfflineSortformerDiarizationConfig() = default;
 
   OfflineSortformerDiarizationConfig(
       const OfflineSortformerDiarizationModelConfig &model, float onset,
       float offset, float pad_onset, float pad_offset, float min_duration_on,
-      float min_duration_off)
+      float min_duration_off, int32_t median_window)
       : model(model),
         onset(onset),
         offset(offset),
         pad_onset(pad_onset),
         pad_offset(pad_offset),
         min_duration_on(min_duration_on),
-        min_duration_off(min_duration_off) {}
+        min_duration_off(min_duration_off),
+        median_window(median_window) {}
 
   void Register(ParseOptions *po);
   bool Validate() const;
