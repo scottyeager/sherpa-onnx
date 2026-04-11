@@ -48,6 +48,7 @@ static constexpr float kSortformerLogGuard = 5.960464478e-8f;  // 2^-24
 static constexpr int32_t kSortformerChunkLen = 124;
 static constexpr int32_t kSortformerFifoLen = 124;
 static constexpr int32_t kSortformerSpkcacheLen = 188;
+static constexpr int32_t kSortformerSpkcacheUpdatePeriod = 188;
 static constexpr int32_t kSortformerRightContext = 1;
 
 // Frame duration in seconds after 8x subsampling.
@@ -402,8 +403,8 @@ class OfflineSortformerDiarization::Impl {
         ReadIntMetaData(meta_data, "spkcache_len", kSortformerSpkcacheLen);
     right_context_ =
         ReadIntMetaData(meta_data, "right_context", kSortformerRightContext);
-    spkcache_update_period_ =
-        ReadIntMetaData(meta_data, "spkcache_update_period", chunk_len_);
+    spkcache_update_period_ = ReadIntMetaData(
+        meta_data, "spkcache_update_period", kSortformerSpkcacheUpdatePeriod);
   }
 
   static int32_t ReadIntMetaData(Ort::ModelMetadata &meta,  // NOLINT
@@ -1230,7 +1231,7 @@ class OfflineSortformerDiarization::Impl {
   int32_t fifo_len_ = kSortformerFifoLen;
   int32_t spkcache_len_ = kSortformerSpkcacheLen;
   int32_t right_context_ = kSortformerRightContext;
-  int32_t spkcache_update_period_ = kSortformerChunkLen;
+  int32_t spkcache_update_period_ = kSortformerSpkcacheUpdatePeriod;
 };
 
 // ----------------------------------------------------------------------------
