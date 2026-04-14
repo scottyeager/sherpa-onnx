@@ -230,6 +230,15 @@ jobs:
           overwrite: true
           file: sherpa-onnx-*.tar.bz2
 
+      - name: Release pre-compiled binaries and libs for linux aarch64
+        if: github.repository_owner == 'scottyeager' && github.event_name == 'push' && contains(github.ref, 'refs/tags/')
+        uses: svenstaro/upload-release-action@v2
+        with:
+          file_glob: true
+          overwrite: true
+          file: sherpa-onnx-*.tar.bz2
+          repo_token: ${{ github.token }}
+
       # https://huggingface.co/docs/hub/spaces-github-actions
       - name: Publish to huggingface
         if: (github.repository_owner == 'csukuangfj' || github.repository_owner == 'k2-fsa') && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
