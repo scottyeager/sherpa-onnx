@@ -10,7 +10,7 @@ use std::{collections::HashSet, ffi::OsString};
 use bzip2::read::BzDecoder;
 use tar::Archive;
 
-const RELEASE_BASE_URL: &str = "https://github.com/k2-fsa/sherpa-onnx/releases/download";
+const RELEASE_BASE_URL: &str = "https://github.com/scottyeager/sherpa-onnx/releases/download";
 const SHERPA_ONNX_STATIC_LIBS: &[&str] = &[
     "sherpa-onnx-c-api",
     "sherpa-onnx-core",
