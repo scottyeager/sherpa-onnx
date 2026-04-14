@@ -410,12 +410,12 @@ class OfflineSortformerDiarization::Impl {
   static int32_t ReadIntMetaData(Ort::ModelMetadata &meta,  // NOLINT
                                  const char *key, int32_t fallback) {
     Ort::AllocatorWithDefaultOptions allocator;
-    auto value = meta.LookupCustomMetadataMapAllocated(key, allocator);
-    if (!value) {
+    std::string value = LookupCustomModelMetaData(meta, key, allocator);
+    if (value.empty()) {
       return fallback;
     }
     try {
-      return std::stoi(value.get());
+      return std::stoi(value);
     } catch (...) {
       return fallback;
     }
